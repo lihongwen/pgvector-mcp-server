@@ -1,0 +1,467 @@
+openapi: 3.0.3
+info:
+  title: pgvector MCP Server Tools
+  description: Model Context Protocol tools for PostgreSQL vector collection management
+  version: 1.0.0
+  
+components:
+  schemas:
+    # 通用响应模式
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          description: 操作结果消息
+      required:
+        - success
+    
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: 错误信息
+      required:
+        - success
+        - error
+    
+    # 集合相关模式
+    Collection:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 集合ID
+        name:
+          type: string
+          description: 集合名称
+        description:
+          type: string
+          description: 集合描述
+        dimension:
+          type: integer
+          description: 向量维度
+          default: 1024
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新时间
+        total_vectors:
+          type: integer
+          description: 向量总数
+      required:
+        - id
+        - name
+        - dimension
+    
+    # 向量记录模式
+    VectorRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 向量记录ID
+        content:
+          type: string
+          description: 原始文本内容
+        metadata:
+          type: object
+          description: 元数据
+        similarity_score:
+          type: number
+          format: float
+          description: 相似度得分
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+      required:
+        - id
+        - content
+
+# MCP工具定义
+tools:
+  # 1. 系统状态检查
+  status:
+    description: 检查系统状态和数据库连接性
+    parameters: {}
+    returns:
+      type: object
+      properties:
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        database:
+          type: object
+          properties:
+            connected:
+              type: boolean
+            url:
+              type: string
+            pgvector_installed:
+              type: boolean
+            pgvector_version:
+              type: string
+        embedding_service:
+          type: object
+          properties:
+            available:
+              type: boolean
+            provider:
+              type: string
+            dimension:
+              type: integer
+        collections:
+          type: object
+          properties:
+            total:
+              type: integer
+            total_vectors:
+              type: integer
+        system:
+          type: object
+          properties:
+            python_version:
+              type: string
+            platform:
+              type: string
+
+  # 2. 创建集合
+  create_collection:
+    description: 创建新的向量集合
+    parameters:
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: '^[a-zA-Z0-9_]{1,64}$'
+          description: 集合名称，只允许字母、数字、下划线
+        description:
+          type: string
+          description: 集合描述
+        dimension:
+          type: integer
+          default: 1024
+          description: 向量维度（固定1024）
+      required:
+        - name
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              collection:
+                $ref: '#/components/schemas/Collection'
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 3. 列出集合
+  list_collections:
+    description: 列出所有活跃的集合
+    parameters:
+      type: object
+      properties:
+        include_documents:
+          type: boolean
+          default: true
+          description: 是否包含文档信息
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              collections:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Collection'
+              total:
+                type: integer
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 4. 显示集合详情
+  show_collection:
+    description: 显示指定集合的详细信息
+    parameters:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 集合名称
+        include_stats:
+          type: boolean
+          default: true
+          description: 是否包含统计信息
+      required:
+        - name
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              collection:
+                allOf:
+                  - $ref: '#/components/schemas/Collection'
+                  - type: object
+                    properties:
+                      statistics:
+                        type: object
+                        properties:
+                          total_vectors:
+                            type: integer
+                          table_name:
+                            type: string
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 5. 重命名集合 (新增功能)
+  rename_collection:
+    description: 重命名现有集合
+    parameters:
+      type: object
+      properties:
+        old_name:
+          type: string
+          description: 当前集合名称
+        new_name:
+          type: string
+          pattern: '^[a-zA-Z0-9_]{1,64}$'
+          description: 新集合名称，只允许字母、数字、下划线
+      required:
+        - old_name
+        - new_name
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              message:
+                type: string
+                example: "集合已从 'old_name' 重命名为 'new_name'"
+              collection:
+                $ref: '#/components/schemas/Collection'
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 6. 删除集合
+  delete_collection:
+    description: 删除集合及其所有向量数据
+    parameters:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 要删除的集合名称
+        confirm:
+          type: boolean
+          default: false
+          description: 确认删除标志（必须为true）
+      required:
+        - name
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              message:
+                type: string
+                example: "集合 'collection_name' 已被删除"
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 7. 添加文本向量
+  add_text:
+    description: 将文本内容添加到集合中作为向量
+    parameters:
+      type: object
+      properties:
+        collection_name:
+          type: string
+          description: 目标集合名称
+        text:
+          type: string
+          minLength: 1
+          description: 要向量化的文本内容
+        metadata:
+          type: object
+          description: 可选的元数据字典
+        embedding_provider:
+          type: string
+          default: "auto"
+          enum: ["auto", "dashscope", "ollama"]
+          description: 嵌入服务提供商
+      required:
+        - collection_name
+        - text
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              vector:
+                $ref: '#/components/schemas/VectorRecord'
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 8. 搜索集合
+  search_collection:
+    description: 在集合中进行向量相似度搜索
+    parameters:
+      type: object
+      properties:
+        collection_name:
+          type: string
+          description: 要搜索的集合名称
+        query:
+          type: string
+          minLength: 1
+          description: 搜索查询文本
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: 最大结果数量
+        search_strategy:
+          type: string
+          default: "smart"
+          enum: ["smart", "sql_only", "semantic_only"]
+          description: 搜索策略
+        metadata_filters:
+          type: object
+          description: JSONB元数据过滤器
+        min_similarity:
+          type: number
+          format: float
+          default: 0.0
+          description: 最小相似度阈值
+        embedding_provider:
+          type: string
+          default: "auto"
+          enum: ["auto", "dashscope", "ollama"]
+          description: 嵌入服务提供商
+      required:
+        - collection_name
+        - query
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              query:
+                type: string
+              collection:
+                type: string
+              total_results:
+                type: integer
+              results:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VectorRecord'
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 9. 添加文档
+  add_document:
+    description: 处理文档文件并将内容添加到集合中
+    parameters:
+      type: object
+      properties:
+        collection_name:
+          type: string
+          description: 目标集合名称
+        file_path:
+          type: string
+          description: 文档文件路径
+        metadata:
+          type: object
+          description: 可选的元数据字典
+        embedding_provider:
+          type: string
+          default: "auto"
+          enum: ["auto", "dashscope", "ollama"]
+          description: 嵌入服务提供商
+      required:
+        - collection_name
+        - file_path
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              file_path:
+                type: string
+              collection:
+                type: string
+              vectors_created:
+                type: integer
+              processing_stats:
+                type: object
+                properties:
+                  total_time_seconds:
+                    type: string
+                  chunks_processed:
+                    type: integer
+              vectors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VectorRecord'
+        - $ref: '#/components/schemas/ErrorResponse'
+
+  # 10. 删除向量
+  delete_vectors:
+    description: 从集合中删除指定的向量
+    parameters:
+      type: object
+      properties:
+        collection_name:
+          type: string
+          description: 目标集合名称
+        file_path:
+          type: string
+          description: 要删除的特定文件路径
+        start_date:
+          type: string
+          format: date
+          description: 日期范围删除的开始日期 (YYYY-MM-DD)
+        end_date:
+          type: string
+          format: date
+          description: 日期范围删除的结束日期 (YYYY-MM-DD)
+        preview_only:
+          type: boolean
+          default: false
+          description: 仅预览不实际删除
+        confirm:
+          type: boolean
+          default: false
+          description: 实际删除的确认标志
+      required:
+        - collection_name
+    returns:
+      oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/SuccessResponse'
+          - type: object
+            properties:
+              deletion_method:
+                type: string
+              deleted_count:
+                type: integer
+              message:
+                type: string
+        - $ref: '#/components/schemas/ErrorResponse'
