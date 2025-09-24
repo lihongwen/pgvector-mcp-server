@@ -30,7 +30,7 @@ class AppProxy:
 
 app = AppProxy()
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __author__ = "FastAI Team"
 __description__ = "Model Context Protocol server for PostgreSQL vector database management with pgvector extension"
 
