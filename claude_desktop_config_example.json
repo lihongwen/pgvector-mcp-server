@@ -2,7 +2,7 @@
   "mcpServers": {
     "pgvector-mcp-server": {
       "command": "uvx",
-      "args": ["pgvector-mcp-server"],
+      "args": ["pgvector-mcp-server@latest"],
       "env": {
         "DATABASE_URL": "postgresql://username:password@localhost:5432/mcp_vectors",
         "DASHSCOPE_API_KEY": "your_dashscope_api_key_here",
