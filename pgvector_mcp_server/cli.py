@@ -8,6 +8,7 @@ Only contains server startup functionality - no CLI tools.
 
 import sys
 import argparse
+from . import __version__
 from typing import Optional
 
 from .server import mcp
@@ -43,7 +44,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--version',
         action='version',
-        version='pgvector-mcp-server 1.0.1'
+        version=f'pgvector-mcp-server {__version__}'
     )
     
     return parser
