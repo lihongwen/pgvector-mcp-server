@@ -73,8 +73,14 @@ class ChunkingService:
                 
                 chunk_index += 1
             
-            # Move start position with overlap
-            start = max(start + self.chunk_size - self.overlap, end)
+            # Move start position with overlap - 修复逻辑
+            # 计算理想的下一个开始位置（基于实际end位置的overlap）
+            ideal_start = end - self.overlap
+            # 确保至少前进合理距离，避免微小chunks或无限循环
+            min_advance = min(self.chunk_size // 4, 50)  # 至少前进chunk_size的1/4或50字符
+            min_start = start + min_advance
+            # 选择合适的起始位置
+            start = max(ideal_start, min_start)
         
         return chunks
     

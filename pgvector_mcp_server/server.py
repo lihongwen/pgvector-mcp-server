@@ -732,15 +732,12 @@ async def add_document(
                     "chunks_processed": len(chunks),
                     "avg_time_per_vector": f"{total_time/len(results):.3f}" if results else "N/A"
                 },
-                "vectors": [
-                    {
-                        "id": record.id,
-                        "content_preview": record.content[:200] + "..." if len(record.content) > 200 else record.content,
-                        "metadata": record.extra_metadata,
-                        "created_at": record.created_at.isoformat()
-                    }
-                    for record in results
-                ]
+                # 简化返回内容，只提供关键统计信息
+                "summary": {
+                    "vector_id_range": f"{results[0].id}-{results[-1].id}" if results else None,
+                    "total_vectors": len(results),
+                    "status": "completed"
+                }
             }
             
     except Exception as e:
