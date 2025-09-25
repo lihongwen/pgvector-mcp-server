@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pgvector-mcp-server"
-version = "1.0.4"
+version = "1.0.5"
 description = "Model Context Protocol server for PostgreSQL vector database management with pgvector extension"
 authors = [{name = "Your Name", email = "your.email@example.com"}]
 license = {text = "MIT"}
