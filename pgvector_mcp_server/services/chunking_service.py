@@ -16,7 +16,7 @@ class TextChunk:
 class ChunkingService:
     """Service for chunking text documents into manageable pieces."""
     
-    def __init__(self, chunk_size: int = 500, overlap: int = 100):
+    def __init__(self, chunk_size: int = 500, overlap: int = 150):
         self.chunk_size = chunk_size
         self.overlap = overlap
     

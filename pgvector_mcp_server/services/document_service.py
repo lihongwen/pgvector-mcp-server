@@ -19,7 +19,7 @@ class DocumentService:
         ]
 
     def process_document(self, file_path: str, chunk_size: int = 500,
-                        overlap: int = 100) -> List[TextChunk]:
+                        overlap: int = 150) -> List[TextChunk]:
         """Process a document file and return chunked content."""
         file_path_obj = Path(file_path)
 

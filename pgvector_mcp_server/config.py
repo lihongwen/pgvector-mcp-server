@@ -38,7 +38,7 @@ class Settings:
         # Technical constants - DashScope embedding dimensions
         self.default_dimension: int = 1024  # Fixed for DashScope text-embedding-v3
         self.max_chunk_size: int = 8192     # DashScope token limit
-        self.default_chunk_overlap: int = 200  # Optimal overlap for context preservation
+        self.default_chunk_overlap: int = 150  # Fixed overlap for chunking
 
 def get_settings() -> Settings:
     """Get application settings."""

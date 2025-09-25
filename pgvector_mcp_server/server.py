@@ -656,7 +656,7 @@ async def add_document(
             
             # Process document with default chunking parameters
             chunks = document_service.process_document(
-                str(file_path_obj), chunk_size=500, overlap=100
+                str(file_path_obj), chunk_size=500, overlap=150
             )
             
             if not chunks:
