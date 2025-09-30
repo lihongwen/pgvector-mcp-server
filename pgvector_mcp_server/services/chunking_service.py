@@ -1,6 +1,5 @@
-"""Text chunking service for pgvector MCP server."""
+"""Text chunking service for pgvector MCP server - Simplified fixed-size chunking."""
 
-import re
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -14,100 +13,90 @@ class TextChunk:
 
 
 class ChunkingService:
-    """Service for chunking text documents into manageable pieces."""
-    
+    """Service for chunking text documents with fixed-size strategy."""
+
     def __init__(self, chunk_size: int = 500, overlap: int = 150):
+        """
+        Initialize chunking service with fixed parameters.
+
+        Args:
+            chunk_size: Fixed size for each chunk (default: 500 characters)
+            overlap: Overlap size between chunks (default: 150 characters, 30%)
+        """
         self.chunk_size = chunk_size
         self.overlap = overlap
-    
+
     def chunk_documents(self, documents: List) -> List[TextChunk]:
-        """Chunk a list of parsed documents."""
+        """Chunk a list of parsed documents using fixed-size strategy."""
         chunks = []
-        
+
         for doc in documents:
             doc_chunks = self.chunk_text(doc.content, doc.metadata)
             chunks.extend(doc_chunks)
-        
+
         return chunks
-    
+
     def chunk_text(self, text: str, base_metadata: Dict[str, Any] = None) -> List[TextChunk]:
-        """Chunk text into overlapping pieces."""
-        if not text or len(text) <= self.chunk_size:
+        """
+        Chunk text into fixed-size overlapping pieces.
+
+        This simplified approach uses pure fixed-size chunking without boundary detection,
+        relying on overlap to preserve semantic continuity and vector model tolerance.
+
+        Args:
+            text: Input text to chunk
+            base_metadata: Base metadata to attach to all chunks
+
+        Returns:
+            List of TextChunk objects with fixed sizes
+        """
+        if not text:
+            return []
+
+        # Handle short text
+        if len(text) <= self.chunk_size:
             return [TextChunk(
                 content=text,
                 metadata=base_metadata or {},
                 start_index=0,
                 end_index=len(text)
             )]
-        
+
         chunks = []
         start = 0
         chunk_index = 0
-        
+
         while start < len(text):
-            # Calculate end position
+            # Fixed-size chunking: simple slice
             end = min(start + self.chunk_size, len(text))
-            
-            # Try to break at sentence boundaries if possible
-            if end < len(text):
-                end = self._find_sentence_boundary(text, start, end)
-            
-            # Extract chunk
-            chunk_text = text[start:end].strip()
-            
-            if chunk_text:  # Only add non-empty chunks
-                metadata = (base_metadata or {}).copy()
-                metadata.update({
-                    'chunk_index': chunk_index,
-                    'chunk_start': start,
-                    'chunk_end': end,
-                    'total_length': len(text)
-                })
-                
-                chunks.append(TextChunk(
-                    content=chunk_text,
-                    metadata=metadata,
-                    start_index=start,
-                    end_index=end
-                ))
-                
-                chunk_index += 1
-            
-            # Move start position with overlap - 修复逻辑
-            # 计算理想的下一个开始位置（基于实际end位置的overlap）
-            ideal_start = end - self.overlap
-            # 确保至少前进合理距离，避免微小chunks或无限循环
-            min_advance = min(self.chunk_size // 4, 50)  # 至少前进chunk_size的1/4或50字符
-            min_start = start + min_advance
-            # 选择合适的起始位置
-            start = max(ideal_start, min_start)
-        
+
+            # Extract chunk (no boundary detection)
+            chunk_text = text[start:end]
+
+            # Build metadata
+            metadata = (base_metadata or {}).copy()
+            metadata.update({
+                'chunk_index': chunk_index,
+                'chunk_start': start,
+                'chunk_end': end,
+                'chunk_size': len(chunk_text),
+                'total_length': len(text)
+            })
+
+            chunks.append(TextChunk(
+                content=chunk_text,
+                metadata=metadata,
+                start_index=start,
+                end_index=end
+            ))
+
+            chunk_index += 1
+
+            # Move to next position with fixed overlap
+            start = end - self.overlap
+
+            # Prevent infinite loop for edge cases
+            if start >= len(text) - self.overlap:
+                break
+
         return chunks
-    
-    def _find_sentence_boundary(self, text: str, start: int, end: int) -> int:
-        """Find a good sentence boundary near the end position."""
-        # Look for sentence endings in the last portion of the chunk
-        search_start = max(start + self.chunk_size // 2, end - 100)
-        
-        # Look for common sentence endings
-        sentence_endings = ['. ', '! ', '? ', '.\n', '!\n', '?\n']
-        
-        best_pos = end
-        for ending in sentence_endings:
-            pos = text.find(ending, search_start, end)
-            if pos != -1:
-                # Found a sentence ending, use position after the ending
-                return pos + len(ending)
-        
-        # If no sentence ending found, try to break at word boundaries
-        return self._find_word_boundary(text, start, end)
-    
-    def _find_word_boundary(self, text: str, start: int, end: int) -> int:
-        """Find a word boundary near the end position."""
-        # Look backwards from end to find a space
-        for i in range(end - 1, max(start, end - 50), -1):
-            if text[i].isspace():
-                return i + 1
-        
-        # If no word boundary found, use original end
-        return end
